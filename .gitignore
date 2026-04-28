@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env.*
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+data/guilds.json
