@@ -83,7 +83,8 @@ function formatLeaderboard(results) {
     const rankText = result.error ? `Error: ${result.error}` : buildRankDisplay(result.rankEntry);
     const riotLabel = `${result.riotId} (${result.region})`;
     const place = PLACE_EMOJI[index] || TRASH_EMOJI;
-    return `${place} ${result.displayName} - ${riotLabel} - ${rankText}`;
+    const name = result.riotId.split("#")[0];
+    return `${place} ${name} - ${riotLabel} - ${rankText}`;
   });
   return `**TFT Leaderboard**\n${lines.join("\n")}`;
 }

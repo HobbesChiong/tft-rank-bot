@@ -84,8 +84,6 @@ async function buildLeaderboard(registrations) {
     try {
       const rankEntry = await fetchTftRankByPuuid(user.puuid, user.region, RIOT_API_KEY);
       results.push({
-        discordId: user.discordId,
-        displayName: user.displayName,
         riotId: user.riotId,
         region: user.region,
         rankEntry,
@@ -93,8 +91,6 @@ async function buildLeaderboard(registrations) {
       });
     } catch (error) {
       results.push({
-        discordId: user.discordId,
-        displayName: user.displayName,
         riotId: user.riotId,
         region: user.region,
         rankEntry: null,
@@ -126,8 +122,6 @@ async function handleRegister(interaction) {
     const canonicalRiotId = `${account.gameName}#${account.tagLine}`;
     const entryKey = `${canonicalRiotId}:${region}`;
     registrations.users[entryKey] = {
-      discordId: interaction.user.id,
-      displayName: account.gameName,
       riotId: `${account.gameName}#${account.tagLine}`,
       region,
       puuid: account.puuid,
