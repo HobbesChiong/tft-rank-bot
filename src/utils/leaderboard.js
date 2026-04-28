@@ -27,6 +27,7 @@ const TIER_EMOJI = {
 };
 
 const PLACE_EMOJI = ["🥇", "🥈", "🥉"];
+const TRASH_EMOJI = "🗑️";
 
 function getTierEmoji(tier) {
   return TIER_EMOJI[tier] || TIER_EMOJI.UNRANKED;
@@ -81,7 +82,7 @@ function formatLeaderboard(results) {
   const lines = results.map((result, index) => {
     const rankText = result.error ? `Error: ${result.error}` : buildRankDisplay(result.rankEntry);
     const riotLabel = `${result.riotId} (${result.region})`;
-    const place = PLACE_EMOJI[index] || `#${index + 1}`;
+    const place = PLACE_EMOJI[index] || TRASH_EMOJI;
     return `${place} ${result.displayName} - ${riotLabel} - ${rankText}`;
   });
   return `**TFT Leaderboard**\n${lines.join("\n")}`;

@@ -18,9 +18,10 @@ Discord bot that stores Riot IDs and posts a TFT rank leaderboard.
 - /register riot_id:RiotName#TAG
 - /leaderboard
 - /setchannel
-- /unregister
+- /unregister riot_id:RiotName#TAG
 
 ## Notes
 
 - Leaderboard auto-posting runs every SCHEDULE_HOURS. Use /setchannel to pick the channel.
-- Regions are platform routing values: NA1, EUW1, EUN1, KR, etc.
+- Region defaults to NA1.
+- The leaderboard includes rank emojis plus wins and losses.
