@@ -19,6 +19,10 @@ const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const DEFAULT_REGION = (process.env.DEFAULT_REGION || "NA1").toUpperCase();
 const SCHEDULE_HOURS = Number(process.env.SCHEDULE_HOURS || "6");
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID || "";
+const SEED_RIOT_IDS = (process.env.SEED_RIOT_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const REGISTRATIONS_PATH = path.join(DATA_DIR, "registrations.json");
@@ -196,9 +200,46 @@ async function postScheduledLeaderboard() {
   await channel.send(formatLeaderboard(results));
 }
 
-client.on("ready", () => {
+async function seedRegistrations() {
+  if (!SEED_RIOT_IDS.length) return;
+  const registrations = readJson(REGISTRATIONS_PATH, { users: {} });
+  registrations.users = registrations.users || {};
+  let changed = false;
+
+  for (const rawId of SEED_RIOT_IDS) {
+    const parsed = parseRiotId(rawId);
+    if (!parsed) {
+      console.warn(`SEED_RIOT_IDS: skipping invalid entry "${rawId}"`);
+      continue;
+    }
+    const entryKey = `${rawId}:${DEFAULT_REGION}`;
+    if (registrations.users[entryKey]) {
+      continue; // already registered, skip
+    }
+    try {
+      const account = await fetchAccountByRiotId(parsed, DEFAULT_REGION, RIOT_API_KEY);
+      const canonicalRiotId = `${account.gameName}#${account.tagLine}`;
+      const canonicalKey = `${canonicalRiotId}:${DEFAULT_REGION}`;
+      registrations.users[canonicalKey] = {
+        riotId: canonicalRiotId,
+        region: DEFAULT_REGION,
+        puuid: account.puuid,
+        lastUpdated: new Date().toISOString()
+      };
+      changed = true;
+      console.log(`Seeded: ${canonicalRiotId}`);
+    } catch (err) {
+      console.error(`SEED_RIOT_IDS: failed to seed "${rawId}": ${err.message}`);
+    }
+  }
+
+  if (changed) writeJson(REGISTRATIONS_PATH, registrations);
+}
+
+client.on("ready", async () => {
   ensureDataFiles(DATA_DIR, REGISTRATIONS_PATH, CONFIG_PATH);
   console.log(`Logged in as ${client.user.tag}`);
+  await seedRegistrations();
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
   const registerCommands = async () => {
