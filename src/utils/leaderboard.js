@@ -34,6 +34,14 @@ function getTierEmoji(tier) {
   return TIER_EMOJI[tier] || TIER_EMOJI.UNRANKED;
 }
 
+function formatWinRate(wins, losses) {
+  const totalGames = wins + losses;
+  if (!totalGames) {
+    return "0.0% WR";
+  }
+  return `${((wins / totalGames) * 100).toFixed(1)}% WR`;
+}
+
 function buildRankDisplay(entry) {
   if (!entry) {
     return `${TIER_EMOJI.UNRANKED} Unranked`;
@@ -41,13 +49,14 @@ function buildRankDisplay(entry) {
   const tier = entry.tier || "UNRANKED";
   const wins = entry.wins ?? 0;
   const losses = entry.losses ?? 0;
+  const winRate = formatWinRate(wins, losses);
   const emoji = getTierEmoji(tier);
   if (tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER") {
-    return `${emoji} ${tier} ${entry.leaguePoints} LP (${wins}W ${losses}L)`;
+    return `${emoji} ${tier} ${entry.leaguePoints} LP (${wins}W ${losses}L ${winRate})`;
   }
   const division = entry.rank || "";
   const lp = entry.leaguePoints ?? 0;
-  return `${emoji} ${tier} ${division} ${lp} LP (${wins}W ${losses}L)`.trim();
+  return `${emoji} ${tier} ${division} ${lp} LP (${wins}W ${losses}L ${winRate})`.trim();
 }
 
 function rankScore(entry) {
@@ -84,11 +93,9 @@ function formatLeaderboard(results, options = {}) {
   const lastIndex = results.length - 1;
   const lines = results.map((result, index) => {
     const rankText = result.error ? `Error: ${result.error}` : buildRankDisplay(result.rankEntry);
-    const riotLabel = `${result.riotId} (${result.region})`;
     const isLastPlace = index === lastIndex && results.length > 1;
     const place = isLastPlace ? DOG_FOOD_EMOJI : PLACE_EMOJI[index] || TRASH_EMOJI;
-    const name = result.riotId.split("#")[0];
-    return `${place} ${name} - ${riotLabel} - ${rankText}`;
+    return `${place} ${result.riotId} - ${rankText}`;
   });
   return `${header}\n${lines.join("\n")}`;
 }
