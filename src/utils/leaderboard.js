@@ -20,14 +20,15 @@ const TIER_EMOJI = {
   EMERALD: "🟩",
   PLATINUM: "🔷",
   GOLD: "🟨",
-  SILVER: "⚪",
-  BRONZE: "🟫",
-  IRON: "⛓️",
+  SILVER: "💩",
+  BRONZE: "💩",
+  IRON: "💩",
   UNRANKED: "❔"
 };
 
 const PLACE_EMOJI = ["🥇", "🥈", "🥉"];
 const TRASH_EMOJI = "🗑️";
+const DOG_FOOD_EMOJI = "🐶🥫";
 
 function getTierEmoji(tier) {
   return TIER_EMOJI[tier] || TIER_EMOJI.UNRANKED;
@@ -75,18 +76,21 @@ function sortLeaderboard(results) {
   return results;
 }
 
-function formatLeaderboard(results) {
+function formatLeaderboard(results, options = {}) {
   if (!results.length) {
     return "No registered players yet.";
   }
+  const header = options.header || "**TFT Leaderboard**";
+  const lastIndex = results.length - 1;
   const lines = results.map((result, index) => {
     const rankText = result.error ? `Error: ${result.error}` : buildRankDisplay(result.rankEntry);
     const riotLabel = `${result.riotId} (${result.region})`;
-    const place = PLACE_EMOJI[index] || TRASH_EMOJI;
+    const isLastPlace = index === lastIndex && results.length > 1;
+    const place = isLastPlace ? DOG_FOOD_EMOJI : PLACE_EMOJI[index] || TRASH_EMOJI;
     const name = result.riotId.split("#")[0];
     return `${place} ${name} - ${riotLabel} - ${rankText}`;
   });
-  return `**TFT Leaderboard**\n${lines.join("\n")}`;
+  return `${header}\n${lines.join("\n")}`;
 }
 
 module.exports = {

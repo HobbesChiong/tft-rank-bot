@@ -18,13 +18,9 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const DEFAULT_REGION = (process.env.DEFAULT_REGION || "NA1").toUpperCase();
 const SCHEDULE_HOURS = Number(process.env.SCHEDULE_HOURS || "6");
+const WINNER_CHECK_HOURS = 1;
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID || "";
-const SEED_RIOT_IDS = (process.env.SEED_RIOT_IDS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
 const REGISTRATIONS_PATH = path.join(DATA_DIR, "registrations.json");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 
@@ -80,6 +76,47 @@ function normalizeRiotIdString(riotId) {
   return riotId.replace(/\s+/g, "").toLowerCase();
 }
 
+function getConfig() {
+  const config = readJson(CONFIG_PATH, {});
+  return {
+    leaderboardChannelId: config.leaderboardChannelId || null,
+    lockedLeaderboard: config.lockedLeaderboard || null
+  };
+}
+
+function formatVancouverDate(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Vancouver",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(date);
+}
+
+function isDiamondOrHigher(rankEntry) {
+  if (!rankEntry?.tier) {
+    return false;
+  }
+  const qualifyingTiers = new Set(["DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]);
+  return qualifyingTiers.has(rankEntry.tier);
+}
+
+function serializeLeaderboardResults(results) {
+  return results.map((result) => ({
+    riotId: result.riotId,
+    region: result.region,
+    rankEntry: result.rankEntry,
+    error: result.error
+  }));
+}
+
+function buildLockedHeader(lockedAt) {
+  return `**Ranks Locked at ${formatVancouverDate(new Date(lockedAt))}**`;
+}
+
 async function buildLeaderboard(registrations) {
   const users = Object.values(registrations.users || {});
   const results = [];
@@ -104,6 +141,79 @@ async function buildLeaderboard(registrations) {
   }
 
   return sortLeaderboard(results);
+}
+
+async function announceWinnerIfPossible(winner, lockedAt) {
+  const config = getConfig();
+  if (!config.leaderboardChannelId) {
+    return;
+  }
+
+  const channel = await client.channels.fetch(config.leaderboardChannelId).catch(() => null);
+  if (!channel) {
+    return;
+  }
+
+  await channel.send(
+    `Congratulations ${winner.riotId} for winning Molediver Cup V3 on ${formatVancouverDate(new Date(lockedAt))}`
+  );
+}
+
+async function getLeaderboardState(options = {}) {
+  const config = getConfig();
+  if (config.lockedLeaderboard) {
+    return {
+      locked: true,
+      justLocked: false,
+      results: config.lockedLeaderboard.results || [],
+      winner: config.lockedLeaderboard.winner || null,
+      lockedAt: config.lockedLeaderboard.lockedAt,
+      header: buildLockedHeader(config.lockedLeaderboard.lockedAt)
+    };
+  }
+
+  const registrations = readJson(REGISTRATIONS_PATH, { users: {} });
+  const results = await buildLeaderboard(registrations);
+  const winner = results.find((result) => !result.error && isDiamondOrHigher(result.rankEntry)) || null;
+
+  if (!winner) {
+    return {
+      locked: false,
+      justLocked: false,
+      results,
+      winner: null,
+      lockedAt: null,
+      header: "**TFT Leaderboard**"
+    };
+  }
+
+  const lockedAt = new Date().toISOString();
+  const lockedLeaderboard = {
+    lockedAt,
+    winner: {
+      riotId: winner.riotId,
+      region: winner.region
+    },
+    results: serializeLeaderboardResults(results)
+  };
+
+  writeJson(CONFIG_PATH, {
+    ...config,
+    lockedLeaderboard
+  });
+
+  if (options.announceWinner !== false) {
+    await announceWinnerIfPossible(winner, lockedAt);
+  }
+
+  return {
+    locked: true,
+    justLocked: true,
+    results: lockedLeaderboard.results,
+    winner: lockedLeaderboard.winner,
+    lockedAt,
+    header: buildLockedHeader(lockedAt)
+  };
 }
 
 async function handleRegister(interaction) {
@@ -143,13 +253,12 @@ async function handleRegister(interaction) {
 }
 
 async function handleLeaderboard(interaction) {
-  const registrations = readJson(REGISTRATIONS_PATH, { users: {} });
-  const results = await buildLeaderboard(registrations);
-  await interaction.reply(formatLeaderboard(results));
+  const leaderboardState = await getLeaderboardState();
+  await interaction.reply(formatLeaderboard(leaderboardState.results, { header: leaderboardState.header }));
 }
 
 async function handleSetChannel(interaction) {
-  const config = readJson(CONFIG_PATH, { leaderboardChannelId: null });
+  const config = getConfig();
   config.leaderboardChannelId = interaction.channelId;
   writeJson(CONFIG_PATH, config);
   await interaction.reply("Leaderboard channel saved.");
@@ -187,7 +296,7 @@ async function handleUnregister(interaction) {
 }
 
 async function postScheduledLeaderboard() {
-  const config = readJson(CONFIG_PATH, { leaderboardChannelId: null });
+  const config = getConfig();
   if (!config.leaderboardChannelId) {
     return;
   }
@@ -195,51 +304,17 @@ async function postScheduledLeaderboard() {
   if (!channel) {
     return;
   }
-  const registrations = readJson(REGISTRATIONS_PATH, { users: {} });
-  const results = await buildLeaderboard(registrations);
-  await channel.send(formatLeaderboard(results));
+  const leaderboardState = await getLeaderboardState();
+  await channel.send(formatLeaderboard(leaderboardState.results, { header: leaderboardState.header }));
 }
 
-async function seedRegistrations() {
-  if (!SEED_RIOT_IDS.length) return;
-  const registrations = readJson(REGISTRATIONS_PATH, { users: {} });
-  registrations.users = registrations.users || {};
-  let changed = false;
-
-  for (const rawId of SEED_RIOT_IDS) {
-    const parsed = parseRiotId(rawId);
-    if (!parsed) {
-      console.warn(`SEED_RIOT_IDS: skipping invalid entry "${rawId}"`);
-      continue;
-    }
-    const entryKey = `${rawId}:${DEFAULT_REGION}`;
-    if (registrations.users[entryKey]) {
-      continue; // already registered, skip
-    }
-    try {
-      const account = await fetchAccountByRiotId(parsed, DEFAULT_REGION, RIOT_API_KEY);
-      const canonicalRiotId = `${account.gameName}#${account.tagLine}`;
-      const canonicalKey = `${canonicalRiotId}:${DEFAULT_REGION}`;
-      registrations.users[canonicalKey] = {
-        riotId: canonicalRiotId,
-        region: DEFAULT_REGION,
-        puuid: account.puuid,
-        lastUpdated: new Date().toISOString()
-      };
-      changed = true;
-      console.log(`Seeded: ${canonicalRiotId}`);
-    } catch (err) {
-      console.error(`SEED_RIOT_IDS: failed to seed "${rawId}": ${err.message}`);
-    }
-  }
-
-  if (changed) writeJson(REGISTRATIONS_PATH, registrations);
+async function checkForWinnerLock() {
+  await getLeaderboardState();
 }
 
 client.on("ready", async () => {
   ensureDataFiles(DATA_DIR, REGISTRATIONS_PATH, CONFIG_PATH);
   console.log(`Logged in as ${client.user.tag}`);
-  await seedRegistrations();
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
   const registerCommands = async () => {
@@ -267,6 +342,13 @@ client.on("ready", async () => {
       });
     }, intervalMs);
   }
+
+  const winnerCheckIntervalMs = WINNER_CHECK_HOURS * 60 * 60 * 1000;
+  setInterval(() => {
+    checkForWinnerLock().catch((error) => {
+      console.error("Winner check failed:", error.message);
+    });
+  }, winnerCheckIntervalMs);
 });
 
 client.on("interactionCreate", async (interaction) => {
