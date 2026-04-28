@@ -1,35 +1,26 @@
 # TFT Rank Bot
 
-A Discord bot that tracks Teamfight Tactics ranks from Riot IDs and posts a per-server leaderboard on demand or on a schedule.
-
-## Features
-- Register Riot IDs with /rank
-- Show leaderboard with /leaderboard
-- Remove your entry with /remove
-- Set scheduled refresh interval with /set-interval (admin only)
-- Includes wins/losses and top-4 rate from recent TFT matches
+Discord bot that stores Riot IDs and posts a TFT rank leaderboard.
 
 ## Setup
-1. Create a Discord bot and copy its token.
-2. Create a Riot API key: https://developer.riotgames.com/
-3. Copy .env.example to .env and fill in the values.
-4. Install dependencies:
-   pip install -r requirements.txt
-5. Run the bot:
-   python run.py
 
-## Configuration
-- DEFAULT_REGION: Riot platform region (e.g., na1, euw1)
-- DEFAULT_MATCH_REGION: Riot routing region for match APIs (e.g., americas, europe, asia)
-- DEFAULT_INTERVAL_HOURS: Scheduled refresh interval per server
-- DEFAULT_MATCH_COUNT: Number of recent matches to use for top-4 stats
-
-## Notes
-- The bot posts scheduled leaderboards to the last channel where /rank or /leaderboard was used.
-- This project uses JSON storage in data/guilds.json.
+1. Install dependencies:
+   - npm install
+2. Copy env file:
+   - copy .env.example .env
+3. Fill in your Discord bot token and Riot API key in .env
+4. Optional: set DISCORD_GUILD_ID to your server ID for instant slash command updates
+5. Start the bot:
+   - npm start
 
 ## Commands
-- /rank <riotId#tag>
+
+- /register riot_id:RiotName#TAG
 - /leaderboard
-- /remove
-- /set-interval <hours>
+- /setchannel
+- /unregister
+
+## Notes
+
+- Leaderboard auto-posting runs every SCHEDULE_HOURS. Use /setchannel to pick the channel.
+- Regions are platform routing values: NA1, EUW1, EUN1, KR, etc.
