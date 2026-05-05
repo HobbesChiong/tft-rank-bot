@@ -5,10 +5,10 @@ function ensureDataFiles(dataDir, registrationsPath, configPath) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
   if (!fs.existsSync(registrationsPath)) {
-    fs.writeFileSync(registrationsPath, JSON.stringify({ users: {} }, null, 2));
+    fs.writeFileSync(registrationsPath, JSON.stringify({ servers: {} }, null, 2));
   }
   if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, JSON.stringify({ leaderboardChannelId: null }, null, 2));
+    fs.writeFileSync(configPath, JSON.stringify({ servers: {} }, null, 2));
   }
 }
 
